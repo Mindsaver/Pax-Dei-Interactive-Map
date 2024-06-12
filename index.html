@@ -110,7 +110,6 @@
     </div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"></script>
     <script>
         var map = L.map('map', {
             minZoom: 0,
@@ -194,7 +193,7 @@
         populateMarkerTypeOptions();
 
         storedMarkers.forEach(function(markerData) {
-            var icon = getIconByType(markerData.t);
+            var icon = getIconByType(markerData.type);
 
             var marker = L.marker([markerData.lat, markerData.lng], {
                 icon: icon,
@@ -207,8 +206,8 @@
                 }]
             }).addTo(map);
 
-            if (markerData.txt) {
-                marker.bindPopup(markerData.txt);
+            if (markerData.text) {
+                marker.bindPopup(markerData.text);
             }
             markers.push(marker);
         });
@@ -240,7 +239,7 @@
                 contextmenuItems: [{
                     text: 'Delete marker',
                     callback: function() {
-                        deleteMarker(marker, { lat: latlng.lat, lng: latlng.lng, txt: text, t: selectedIconType });
+                        deleteMarker(marker, { lat: latlng.lat, lng: latlng.lng, text: text, type: selectedIconType });
                     }
                 }]
             }).addTo(map);
@@ -256,7 +255,7 @@
         }
 
         function storeMarker(latlng, text, type) {
-            var markerData = { lat: latlng.lat, lng: latlng.lng, txt: text, t: type };
+            var markerData = { lat: latlng.lat, lng: latlng.lng, text: text, type: type };
             storedMarkers.push(markerData);
             localStorage.setItem('markers', JSON.stringify(storedMarkers));
         }
@@ -274,21 +273,18 @@
 
         function shareMarkers() {
             var markersData = JSON.stringify(storedMarkers);
-            var compressedData = pako.deflate(markersData, { to: 'string' });
-            var encodedData = btoa(compressedData);
+            var encodedData = btoa(markersData);
             var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
             prompt("Share this link to import markers:", shareLink);
         }
 
         function importMarkers() {
             var importData = document.getElementById('importData').value;
-            var decodedData = atob(importData);
-            var decompressedData = pako.inflate(decodedData, { to: 'string' });
-            var importedMarkers = JSON.parse(decompressedData);
+            var importedMarkers = JSON.parse(atob(importData));
 
             importedMarkers.forEach(function(markerData) {
                 if (!isMarkerExist(markerData)) {
-                    var icon = getIconByType(markerData.t);
+                    var icon = getIconByType(markerData.type);
 
                     var marker = L.marker([markerData.lat, markerData.lng], {
                         icon: icon,
@@ -301,11 +297,11 @@
                         }]
                     }).addTo(map);
 
-                    if (markerData.txt) {
-                        marker.bindPopup(markerData.txt);
+                    if (markerData.text) {
+                        marker.bindPopup(markerData.text);
                     }
                     markers.push(marker);
-                    storeMarker(markerData, markerData.txt, markerData.t);
+                    storeMarker(markerData, markerData.text, markerData.type);
                 }
             });
         }
@@ -329,8 +325,7 @@
             var urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('markers')) {
                 var sharedMarkersData = atob(urlParams.get('markers'));
-                var decompressedData = pako.inflate(sharedMarkersData, { to: 'string' });
-                var sharedMarkers = JSON.parse(decompressedData);
+                var sharedMarkers = JSON.parse(sharedMarkersData);
                 importSharedMarkers(sharedMarkers);
             }
         }
@@ -338,7 +333,7 @@
         function importSharedMarkers(sharedMarkers) {
             sharedMarkers.forEach(function(markerData) {
                 if (!isMarkerExist(markerData)) {
-                    var icon = getIconByType(markerData.t);
+                    var icon = getIconByType(markerData.type);
 
                     var marker = L.marker([markerData.lat, markerData.lng], {
                         icon: icon,
@@ -351,11 +346,11 @@
                         }]
                     }).addTo(map);
 
-                    if (markerData.txt) {
-                        marker.bindPopup(markerData.txt);
+                    if (markerData.text) {
+                        marker.bindPopup(markerData.text);
                     }
                     markers.push(marker);
-                    storeMarker(markerData, markerData.txt, markerData.t);
+                    storeMarker(markerData, markerData.text, markerData.type);
                 }
             });
         }
