@@ -38,6 +38,45 @@
             display: block;
             margin-bottom: 10px;
         }
+        .icon-dropdown {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+        }
+        .icon-dropdown select {
+            display: none; /* Hide the default select element */
+        }
+        .icon-dropdown .selected-icon {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            border: 1px solid #ccc;
+            cursor: pointer;
+        }
+        .icon-dropdown .selected-icon img {
+            margin-right: 10px;
+        }
+        .icon-dropdown .icon-options {
+            display: none;
+            position: absolute;
+            background: white;
+            border: 1px solid #ccc;
+            box-shadow: 0 0 10px rgba(0,0,0,0.5);
+            width: 100%;
+            z-index: 100;
+        }
+        .icon-dropdown .icon-option {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            cursor: pointer;
+        }
+        .icon-dropdown .icon-option:hover {
+            background: #eee;
+        }
+        .icon-dropdown .icon-option img {
+            margin-right: 10px;
+        }
     </style>
 </head>
 <body>
@@ -52,11 +91,13 @@
         <h3>Create Marker</h3>
         <label>
             Marker Type:
-            <select id="markerType">
-                <option value="house">House</option>
-                <option value="ore">Ore</option>
-                <option value="pin">Pin</option>
-            </select>
+            <div id="iconDropdown" class="icon-dropdown">
+                <div class="selected-icon" onclick="toggleIconOptions()">
+                    <img id="selectedIconImg" src="" alt="Select Icon" width="32" height="32">
+                    <span id="selectedIconText">Select Icon</span>
+                </div>
+                <div class="icon-options"></div>
+            </div>
         </label>
         <label>
             Marker Text:
@@ -91,27 +132,58 @@
         L.imageOverlay('Fullmap_web_courtesy_of_Phoenix.jpg', bounds).addTo(map);
         map.setMaxBounds(bounds);
 
-        var houseIcon = L.icon({
-            iconUrl: 'icons/house.png', // Replace with your house icon URL
-            iconSize: [32, 32]
-        });
+        var icons = {
+            house: { iconUrl: 'icons/house.png', iconSize: [32, 32] },
+            ore: { iconUrl: 'icons/ore.png', iconSize: [32, 32] },
+            bear: { iconUrl: 'icons/bear.png', iconSize: [32, 32] },
+            deer: { iconUrl: 'icons/deer.png', iconSize: [32, 32] },
+            boar: { iconUrl: 'icons/boar.png', iconSize: [32, 32] },
+            castle: { iconUrl: 'icons/castle.png', iconSize: [32, 32] },
+            wolf: { iconUrl: 'icons/wolf.png', iconSize: [32, 32] }
+        };
 
-        var oreIcon = L.icon({
-            iconUrl: 'icons/ore.png', // Replace with your ore icon URL
-            iconSize: [32, 32]
-        });
-
-        var pinIcon = L.icon({
-            iconUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png',
-            iconSize: [25, 41],
-            iconAnchor: [12, 41],
-            popupAnchor: [1, -34],
-            shadowUrl: 'https://unpkg.com/leaflet@1.7.1/dist/images/marker-shadow.png',
-            shadowSize: [41, 41]
-        });
-
+        var selectedIconType = null;
         var markers = [];
         var storedMarkers = JSON.parse(localStorage.getItem('markers')) || [];
+
+        function getIconByType(type) {
+            return L.icon(icons[type] || icons.house);
+        }
+
+        function populateMarkerTypeOptions() {
+            var iconDropdown = document.getElementById('iconDropdown');
+            var iconOptionsDiv = iconDropdown.querySelector('.icon-options');
+            var firstIconSelected = false;
+            for (var type in icons) {
+                var optionDiv = document.createElement('div');
+                optionDiv.className = 'icon-option';
+                optionDiv.dataset.type = type;
+                optionDiv.innerHTML = '<img src="' + icons[type].iconUrl + '" width="32" height="32">' + type.charAt(0).toUpperCase() + type.slice(1);
+                optionDiv.onclick = function() {
+                    selectIcon(this.dataset.type, icons[this.dataset.type].iconUrl);
+                    toggleIconOptions();
+                };
+                iconOptionsDiv.appendChild(optionDiv);
+
+                if (!firstIconSelected) {
+                    selectIcon(type, icons[type].iconUrl);
+                    firstIconSelected = true;
+                }
+            }
+        }
+
+        function selectIcon(type, iconUrl) {
+            selectedIconType = type;
+            document.getElementById('selectedIconImg').src = iconUrl;
+            document.getElementById('selectedIconText').innerText = type.charAt(0).toUpperCase() + type.slice(1);
+        }
+
+        function toggleIconOptions() {
+            var iconOptionsDiv = document.querySelector('.icon-dropdown .icon-options');
+            iconOptionsDiv.style.display = (iconOptionsDiv.style.display === 'block') ? 'none' : 'block';
+        }
+
+        populateMarkerTypeOptions();
 
         storedMarkers.forEach(function(markerData) {
             var icon = getIconByType(markerData.type);
@@ -133,25 +205,26 @@
             markers.push(marker);
         });
 
-        // Function to open marker form
         function openMarkerForm(e) {
             var latlng = e.latlng;
             document.getElementById('markerFormOverlay').style.display = 'block';
             document.getElementById('markerFormOverlay').dataset.latlng = JSON.stringify(latlng);
         }
 
-        // Function to close marker form
         function closeMarkerForm() {
             document.getElementById('markerFormOverlay').style.display = 'none';
         }
 
-        // Function to add a marker
         function addMarker() {
+            if (!selectedIconType) {
+                alert('Please select a marker type.');
+                return;
+            }
+
             var latlng = JSON.parse(document.getElementById('markerFormOverlay').dataset.latlng);
-            var type = document.getElementById('markerType').value;
             var text = document.getElementById('markerText').value;
 
-            var icon = getIconByType(type);
+            var icon = getIconByType(selectedIconType);
 
             var marker = L.marker(latlng, {
                 icon: icon,
@@ -159,7 +232,7 @@
                 contextmenuItems: [{
                     text: 'Delete marker',
                     callback: function() {
-                        deleteMarker(marker, { lat: latlng.lat, lng: latlng.lng, text: text, type: type });
+                        deleteMarker(marker, { lat: latlng.lat, lng: latlng.lng, text: text, type: selectedIconType });
                     }
                 }]
             }).addTo(map);
@@ -168,31 +241,18 @@
                 marker.bindPopup(text).openPopup();
             }
 
-            storeMarker(latlng, text, type);
+            storeMarker(latlng, text, selectedIconType);
             markers.push(marker);
 
             closeMarkerForm();
         }
 
-        // Get icon by marker type
-        function getIconByType(type) {
-            if (type === 'house') {
-                return houseIcon;
-            } else if (type === 'ore') {
-                return oreIcon;
-            } else {
-                return pinIcon;
-            }
-        }
-
-        // Store marker function
         function storeMarker(latlng, text, type) {
             var markerData = { lat: latlng.lat, lng: latlng.lng, text: text, type: type };
             storedMarkers.push(markerData);
             localStorage.setItem('markers', JSON.stringify(storedMarkers));
         }
 
-        // Delete marker function
         function deleteMarker(marker, markerData) {
             map.removeLayer(marker);
             var index = storedMarkers.findIndex(function(m) {
@@ -204,7 +264,6 @@
             }
         }
 
-        // Share markers function
         function shareMarkers() {
             var markersData = JSON.stringify(storedMarkers);
             var encodedData = btoa(markersData);
@@ -212,7 +271,6 @@
             prompt("Share this link to import markers:", shareLink);
         }
 
-        // Import markers function
         function importMarkers() {
             var importData = document.getElementById('importData').value;
             var importedMarkers = JSON.parse(atob(importData));
@@ -241,14 +299,12 @@
             });
         }
 
-        // Check if marker exists function
         function isMarkerExist(markerData) {
             return storedMarkers.some(function(storedMarker) {
                 return storedMarker.lat === markerData.lat && storedMarker.lng === markerData.lng;
             });
         }
 
-        // Clean markers function
         function cleanMarkers() {
             markers.forEach(function(marker) {
                 map.removeLayer(marker);
@@ -258,7 +314,6 @@
             localStorage.removeItem('markers');
         }
 
-        // Check for shared markers in URL
         function checkForSharedMarkers() {
             var urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('markers')) {
@@ -268,7 +323,6 @@
             }
         }
 
-        // Import shared markers from URL
         function importSharedMarkers(sharedMarkers) {
             sharedMarkers.forEach(function(markerData) {
                 if (!isMarkerExist(markerData)) {
@@ -294,7 +348,6 @@
             });
         }
 
-        // Initialize
         checkForSharedMarkers();
     </script>
 </body>
