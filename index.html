@@ -8,10 +8,29 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.css" />
     <style>
         #map { height: 100vh; }
+        .map-overlay {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 1000;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            box-shadow: 0 0 5px rgba(0,0,0,0.5);
+        }
+        .map-overlay button {
+            display: block;
+            margin-bottom: 5px;
+        }
     </style>
 </head>
 <body>
     <div id="map"></div>
+    <div class="map-overlay">
+        <button onclick="shareMarkers()">Share Markers</button>
+        <textarea id="importData" placeholder="Paste shared markers data here"></textarea>
+        <button onclick="importMarkers()">Import Markers</button>
+    </div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"></script>
     <script>
@@ -37,6 +56,11 @@
 
         L.imageOverlay('map.jpg', bounds).addTo(map);
         map.setMaxBounds(bounds);
+
+        // Prevent the default context menu from appearing on right-click
+        map.getContainer().addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
 
         // Load stored markers
         var storedMarkers = JSON.parse(localStorage.getItem('markers')) || [];
@@ -99,10 +123,82 @@
             }
         }
 
-        // Prevent default context menu
-        map.getContainer().addEventListener('contextmenu', function(e) {
-            e.preventDefault();
-        });
+        // Share markers function
+        function shareMarkers() {
+            var markersData = JSON.stringify(storedMarkers);
+            var encodedData = btoa(markersData);
+            var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
+            prompt("Share this link to import markers:", shareLink);
+        }
+
+        // Import markers function
+        function importMarkers() {
+            var importData = document.getElementById('importData').value;
+            var importedMarkers = JSON.parse(atob(importData));
+
+            importedMarkers.forEach(function(markerData) {
+                if (!isMarkerExist(markerData)) {
+                    var marker = L.marker([markerData.lat, markerData.lng], {
+                        contextmenu: true,
+                        contextmenuItems: [{
+                            text: 'Delete marker',
+                            callback: function() {
+                                deleteMarker(marker, markerData);
+                            }
+                        }]
+                    }).addTo(map);
+
+                    if (markerData.text) {
+                        marker.bindPopup(markerData.text);
+                    }
+                    markers.push(marker);
+                    storeMarker(markerData, markerData.text);
+                }
+            });
+        }
+
+        // Check if marker exists function
+        function isMarkerExist(markerData) {
+            return storedMarkers.some(function(storedMarker) {
+                return storedMarker.lat === markerData.lat && storedMarker.lng === markerData.lng;
+            });
+        }
+
+        // Check for shared markers in URL
+        function checkForSharedMarkers() {
+            var urlParams = new URLSearchParams(window.location.search);
+            if (urlParams.has('markers')) {
+                var sharedMarkersData = atob(urlParams.get('markers'));
+                var sharedMarkers = JSON.parse(sharedMarkersData);
+                importSharedMarkers(sharedMarkers);
+            }
+        }
+
+        // Import shared markers from URL
+        function importSharedMarkers(sharedMarkers) {
+            sharedMarkers.forEach(function(markerData) {
+                if (!isMarkerExist(markerData)) {
+                    var marker = L.marker([markerData.lat, markerData.lng], {
+                        contextmenu: true,
+                        contextmenuItems: [{
+                            text: 'Delete marker',
+                            callback: function() {
+                                deleteMarker(marker, markerData);
+                            }
+                        }]
+                    }).addTo(map);
+
+                    if (markerData.text) {
+                        marker.bindPopup(markerData.text);
+                    }
+                    markers.push(marker);
+                    storeMarker(markerData, markerData.text);
+                }
+            });
+        }
+
+        // Initialize
+        checkForSharedMarkers();
     </script>
 </body>
 </html>
