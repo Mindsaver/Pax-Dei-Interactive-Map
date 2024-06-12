@@ -110,6 +110,7 @@
     </div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"></script>
     <script>
         var map = L.map('map', {
             minZoom: 0,
@@ -273,14 +274,17 @@
 
         function shareMarkers() {
             var markersData = JSON.stringify(storedMarkers);
-            var encodedData = btoa(markersData);
+            var compressedData = pako.deflate(markersData, { to: 'string' });
+            var encodedData = btoa(compressedData);
             var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
             prompt("Share this link to import markers:", shareLink);
         }
 
         function importMarkers() {
             var importData = document.getElementById('importData').value;
-            var importedMarkers = JSON.parse(atob(importData));
+            var decodedData = atob(importData);
+            var decompressedData = pako.inflate(decodedData, { to: 'string' });
+            var importedMarkers = JSON.parse(decompressedData);
 
             importedMarkers.forEach(function(markerData) {
                 if (!isMarkerExist(markerData)) {
@@ -325,7 +329,8 @@
             var urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('markers')) {
                 var sharedMarkersData = atob(urlParams.get('markers'));
-                var sharedMarkers = JSON.parse(sharedMarkersData);
+                var decompressedData = pako.inflate(sharedMarkersData, { to: 'string' });
+                var sharedMarkers = JSON.parse(decompressedData);
                 importSharedMarkers(sharedMarkers);
             }
         }
