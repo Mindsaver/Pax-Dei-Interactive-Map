@@ -63,6 +63,8 @@
             border: 1px solid #ccc;
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
             width: 100%;
+            max-height: 200px; /* Set the max height for the dropdown */
+            overflow-y: auto; /* Enable vertical scrolling */
             z-index: 100;
         }
         .icon-dropdown .icon-option {
@@ -139,7 +141,12 @@
             deer: { iconUrl: 'icons/deer.png', iconSize: [32, 32] },
             boar: { iconUrl: 'icons/boar.png', iconSize: [32, 32] },
             castle: { iconUrl: 'icons/castle.png', iconSize: [32, 32] },
-            wolf: { iconUrl: 'icons/wolf.png', iconSize: [32, 32] }
+            wolf: { iconUrl: 'icons/wolf.png', iconSize: [32, 32] },
+            apple: { iconUrl: 'icons/apple.png', iconSize: [32, 32] },
+            olive: { iconUrl: 'icons/olive.png', iconSize: [32, 32] },
+            reed: { iconUrl: 'icons/reed.png', iconSize: [32, 32] },
+            flag: { iconUrl: 'icons/flag.png', iconSize: [32, 32] },
+            skull: { iconUrl: 'icons/skull.png', iconSize: [32, 32] }
         };
 
         var selectedIconType = null;
