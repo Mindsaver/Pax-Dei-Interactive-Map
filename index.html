@@ -83,12 +83,12 @@
             }]
         });
 
-        var w = 7000, h = 9887; // Dimensions of the image
+        var w = 5250, h = 7415; // Dimensions of the image
         var southWest = map.unproject([0, h], map.getMaxZoom()-1);
         var northEast = map.unproject([w, 0], map.getMaxZoom()-1);
         var bounds = new L.LatLngBounds(southWest, northEast);
 
-        L.imageOverlay('map.jpg', bounds).addTo(map);
+        L.imageOverlay('Fullmap_web_courtesy_of_Phoenix.jpg', bounds).addTo(map);
         map.setMaxBounds(bounds);
 
         var houseIcon = L.icon({
