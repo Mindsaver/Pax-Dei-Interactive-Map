@@ -46,6 +46,7 @@
         <button onclick="shareMarkers()">Share Markers</button>
         <textarea id="importData" placeholder="Paste shared markers data here"></textarea>
         <button onclick="importMarkers()">Import Markers</button>
+        <button onclick="cleanMarkers()">Clean Markers</button>
     </div>
     <div id="markerFormOverlay">
         <h3>Create Marker</h3>
@@ -91,12 +92,12 @@
         map.setMaxBounds(bounds);
 
         var houseIcon = L.icon({
-            iconUrl: 'house_icon_32x32.png', // Replace with your house icon URL
+            iconUrl: 'https://example.com/house-icon.png', // Replace with your house icon URL
             iconSize: [32, 32]
         });
 
         var oreIcon = L.icon({
-            iconUrl: 'stone_icon_32x32.png', // Replace with your ore icon URL
+            iconUrl: 'https://example.com/ore-icon.png', // Replace with your ore icon URL
             iconSize: [32, 32]
         });
 
@@ -245,6 +246,16 @@
             return storedMarkers.some(function(storedMarker) {
                 return storedMarker.lat === markerData.lat && storedMarker.lng === markerData.lng;
             });
+        }
+
+        // Clean markers function
+        function cleanMarkers() {
+            markers.forEach(function(marker) {
+                map.removeLayer(marker);
+            });
+            markers = [];
+            storedMarkers = [];
+            localStorage.removeItem('markers');
         }
 
         // Check for shared markers in URL
