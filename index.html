@@ -1,10 +1,11 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Custom Map</title>
+    <title>Interactive Map with Custom Text Markers</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.css" />
     <style>
         #map { height: 100vh; }
     </style>
@@ -12,22 +13,96 @@
 <body>
     <div id="map"></div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"></script>
     <script>
         var map = L.map('map', {
             minZoom: 0,
             maxZoom: 4,
             center: [0, 0],
             zoom: 0,
-            crs: L.CRS.Simple
+            crs: L.CRS.Simple,
+            contextmenu: true,
+            contextmenuWidth: 140,
+            contextmenuItems: [{
+                text: 'Create marker',
+                callback: createMarker,
+                index: 0
+            }]
         });
 
-        var w = 7000, h = 9887; // Adjust these to the dimensions of your image
+        var w = 7000, h = 9887; // Dimensions of the image
         var southWest = map.unproject([0, h], map.getMaxZoom()-1);
         var northEast = map.unproject([w, 0], map.getMaxZoom()-1);
         var bounds = new L.LatLngBounds(southWest, northEast);
 
         L.imageOverlay('map.jpg', bounds).addTo(map);
         map.setMaxBounds(bounds);
+
+        // Load stored markers
+        var storedMarkers = JSON.parse(localStorage.getItem('markers')) || [];
+        var markers = [];
+
+        storedMarkers.forEach(function(markerData) {
+            var marker = L.marker([markerData.lat, markerData.lng], {
+                contextmenu: true,
+                contextmenuItems: [{
+                    text: 'Delete marker',
+                    callback: function() {
+                        deleteMarker(marker, markerData);
+                    }
+                }]
+            }).addTo(map);
+
+            if (markerData.text) {
+                marker.bindPopup(markerData.text);
+            }
+            markers.push(marker);
+        });
+
+        // Function to create a marker
+        function createMarker(e) {
+            var markerText = prompt("Enter text for the marker:");
+            var marker = L.marker(e.latlng, {
+                contextmenu: true,
+                contextmenuItems: [{
+                    text: 'Delete marker',
+                    callback: function() {
+                        deleteMarker(marker, {lat: e.latlng.lat, lng: e.latlng.lng, text: markerText});
+                    }
+                }]
+            }).addTo(map);
+
+            if (markerText) {
+                marker.bindPopup(markerText).openPopup();
+            }
+
+            storeMarker(e.latlng, markerText);
+            markers.push(marker);
+        }
+
+        // Store marker function
+        function storeMarker(latlng, text) {
+            var markerData = {lat: latlng.lat, lng: latlng.lng, text: text};
+            storedMarkers.push(markerData);
+            localStorage.setItem('markers', JSON.stringify(storedMarkers));
+        }
+
+        // Delete marker function
+        function deleteMarker(marker, markerData) {
+            map.removeLayer(marker);
+            var index = storedMarkers.findIndex(function(m) {
+                return m.lat === markerData.lat && m.lng === markerData.lng;
+            });
+            if (index !== -1) {
+                storedMarkers.splice(index, 1);
+                localStorage.setItem('markers', JSON.stringify(storedMarkers));
+            }
+        }
+
+        // Prevent default context menu
+        map.getContainer().addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+        });
     </script>
 </body>
 </html>
