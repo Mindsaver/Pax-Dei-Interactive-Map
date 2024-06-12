@@ -194,7 +194,7 @@
         populateMarkerTypeOptions();
 
         storedMarkers.forEach(function(markerData) {
-            var icon = getIconByType(markerData.type);
+            var icon = getIconByType(markerData.t);
 
             var marker = L.marker([markerData.lat, markerData.lng], {
                 icon: icon,
@@ -207,8 +207,8 @@
                 }]
             }).addTo(map);
 
-            if (markerData.text) {
-                marker.bindPopup(markerData.text);
+            if (markerData.txt) {
+                marker.bindPopup(markerData.txt);
             }
             markers.push(marker);
         });
@@ -240,7 +240,7 @@
                 contextmenuItems: [{
                     text: 'Delete marker',
                     callback: function() {
-                        deleteMarker(marker, { lat: latlng.lat, lng: latlng.lng, text: text, type: selectedIconType });
+                        deleteMarker(marker, { lat: latlng.lat, lng: latlng.lng, txt: text, t: selectedIconType });
                     }
                 }]
             }).addTo(map);
@@ -256,7 +256,7 @@
         }
 
         function storeMarker(latlng, text, type) {
-            var markerData = { lat: latlng.lat, lng: latlng.lng, text: text, type: type };
+            var markerData = { lat: latlng.lat, lng: latlng.lng, txt: text, t: type };
             storedMarkers.push(markerData);
             localStorage.setItem('markers', JSON.stringify(storedMarkers));
         }
@@ -288,7 +288,7 @@
 
             importedMarkers.forEach(function(markerData) {
                 if (!isMarkerExist(markerData)) {
-                    var icon = getIconByType(markerData.type);
+                    var icon = getIconByType(markerData.t);
 
                     var marker = L.marker([markerData.lat, markerData.lng], {
                         icon: icon,
@@ -301,11 +301,11 @@
                         }]
                     }).addTo(map);
 
-                    if (markerData.text) {
-                        marker.bindPopup(markerData.text);
+                    if (markerData.txt) {
+                        marker.bindPopup(markerData.txt);
                     }
                     markers.push(marker);
-                    storeMarker(markerData, markerData.text, markerData.type);
+                    storeMarker(markerData, markerData.txt, markerData.t);
                 }
             });
         }
@@ -338,7 +338,7 @@
         function importSharedMarkers(sharedMarkers) {
             sharedMarkers.forEach(function(markerData) {
                 if (!isMarkerExist(markerData)) {
-                    var icon = getIconByType(markerData.type);
+                    var icon = getIconByType(markerData.t);
 
                     var marker = L.marker([markerData.lat, markerData.lng], {
                         icon: icon,
@@ -351,11 +351,11 @@
                         }]
                     }).addTo(map);
 
-                    if (markerData.text) {
-                        marker.bindPopup(markerData.text);
+                    if (markerData.txt) {
+                        marker.bindPopup(markerData.txt);
                     }
                     markers.push(marker);
-                    storeMarker(markerData, markerData.text, markerData.type);
+                    storeMarker(markerData, markerData.txt, markerData.t);
                 }
             });
         }
