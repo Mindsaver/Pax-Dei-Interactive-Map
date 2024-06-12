@@ -110,6 +110,7 @@
     </div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"></script>
+    <script src="lzma_worker-min.js"></script>
     <script>
         var map = L.map('map', {
             minZoom: 0,
@@ -193,24 +194,24 @@
         populateMarkerTypeOptions();
 
         storedMarkers.forEach(function(markerData) {
-            var icon = getIconByType(markerData.type);
+        var icon = getIconByType(markerData.type);
 
-            var marker = L.marker([markerData.lat, markerData.lng], {
-                icon: icon,
-                contextmenu: true,
-                contextmenuItems: [{
-                    text: 'Delete marker',
-                    callback: function() {
-                        deleteMarker(marker, markerData);
-                    }
-                }]
-            }).addTo(map);
+        var marker = L.marker([markerData.lat, markerData.lng], {
+            icon: icon,
+            contextmenu: true,
+            contextmenuItems: [{
+                text: 'Delete marker',
+                callback: function() {
+                    deleteMarker(marker, markerData);
+                }
+            }]
+        }).addTo(map);
 
-            if (markerData.text) {
-                marker.bindPopup(markerData.text);
-            }
-            markers.push(marker);
-        });
+        if (markerData.text) {
+            marker.bindPopup(markerData.text);
+        }
+        markers.push(marker);
+    });
 
         function openMarkerForm(e) {
             var latlng = e.latlng;
@@ -271,17 +272,39 @@
             }
         }
 
+        function base64UrlEncode(arrayBuffer) {
+            var base64 = btoa(String.fromCharCode.apply(null, new Uint8Array(arrayBuffer)));
+            return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        }
+
+        function base64UrlDecode(base64) {
+            base64 = base64.replace(/-/g, '+').replace(/_/g, '/');
+            while (base64.length % 4) {
+                base64 += '=';
+            }
+            return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
+        }
+
         function shareMarkers() {
             var markersData = JSON.stringify(storedMarkers);
-            var encodedData = btoa(markersData);
-            var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
-            prompt("Share this link to import markers:", shareLink);
+            LZMA.compress(markersData, 1, function(result) {
+                var compressedData = new Uint8Array(result);
+                var encodedData = base64UrlEncode(compressedData);
+                var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
+                prompt("Share this link to import markers:", shareLink);
+            });
         }
 
         function importMarkers() {
             var importData = document.getElementById('importData').value;
-            var importedMarkers = JSON.parse(atob(importData));
+            var compressedData = base64UrlDecode(importData);
+            LZMA.decompress(compressedData, function(result) {
+                var importedMarkers = JSON.parse(result);
+                addImportedMarkers(importedMarkers);
+            });
+        }
 
+        function addImportedMarkers(importedMarkers) {
             importedMarkers.forEach(function(markerData) {
                 if (!isMarkerExist(markerData)) {
                     var icon = getIconByType(markerData.type);
@@ -324,9 +347,12 @@
         function checkForSharedMarkers() {
             var urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('markers')) {
-                var sharedMarkersData = atob(urlParams.get('markers'));
-                var sharedMarkers = JSON.parse(sharedMarkersData);
-                importSharedMarkers(sharedMarkers);
+                var encodedData = urlParams.get('markers');
+                var compressedData = base64UrlDecode(encodedData);
+                LZMA.decompress(compressedData, function(result) {
+                    var sharedMarkers = JSON.parse(result);
+                    importSharedMarkers(sharedMarkers);
+                });
             }
         }
 
