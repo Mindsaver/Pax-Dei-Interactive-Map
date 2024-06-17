@@ -319,11 +319,12 @@
 
         function updateShareLink() {
             var markersData = JSON.stringify(storedMarkers);
+
             LZMA.compress(markersData, 1, function(result) {
                 var compressedData = new Uint8Array(result);
                 var encodedData = base64UrlEncode(compressedData);
                 var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
-                history.replaceState(null, '', shareLink);
+               // history.replaceState(null, '', shareLink);
             });
         }
 
