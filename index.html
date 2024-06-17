@@ -4,8 +4,10 @@
     <title>Interactive Map with Custom Text Markers</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css" />
     <style>
         #map { height: 100vh; }
         .map-overlay {
@@ -22,7 +24,7 @@
             display: block;
             margin-bottom: 5px;
         }
-        #markerFormOverlay {
+        #markerFormOverlay, #shareModal {
             position: fixed;
             top: 50%;
             left: 50%;
@@ -33,10 +35,8 @@
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
             z-index: 2000;
             display: none;
-        }
-        #markerFormOverlay label {
-            display: block;
-            margin-bottom: 10px;
+            width: 400px; /* Increased width */
+            max-width: 90vw; /* Make sure it fits within the viewport */
         }
         .icon-dropdown {
             position: relative;
@@ -84,15 +84,13 @@
 <body>
     <div id="map"></div>
     <div class="map-overlay">
-        <button onclick="shareMarkers()">Share Markers</button>
-        <textarea id="importData" placeholder="Paste shared markers data here"></textarea>
-        <button onclick="importMarkers()">Import Markers</button>
-        <button onclick="cleanMarkers()">Clean Markers</button>
+        <button class="button is-small is-primary" onclick="shareMarkers()">Share Markers</button>
+        <button class="button is-small is-danger" onclick="cleanMarkers()">Clean Markers</button>
     </div>
-    <div id="markerFormOverlay">
-        <h3>Create Marker</h3>
-        <label>
-            Marker Type:
+    <div id="markerFormOverlay" class="box">
+        <h3 class="title is-4">Create Marker</h3>
+        <div class="field">
+            <label class="label">Marker Type:</label>
             <div id="iconDropdown" class="icon-dropdown">
                 <div class="selected-icon" onclick="toggleIconOptions()">
                     <img id="selectedIconImg" src="" alt="Select Icon" width="32" height="32">
@@ -100,18 +98,43 @@
                 </div>
                 <div class="icon-options"></div>
             </div>
-        </label>
-        <label>
-            Marker Text:
-            <input type="text" id="markerText" />
-        </label>
-        <button onclick="addMarker()">Add Marker</button>
-        <button onclick="closeMarkerForm()">Cancel</button>
+        </div>
+        <div class="field">
+            <label class="label">Marker Text:</label>
+            <input class="input" type="text" id="markerText" />
+        </div>
+        <div class="field is-grouped">
+            <p class="control">
+                <button class="button is-primary" onclick="addMarker()">Add Marker</button>
+            </p>
+            <p class="control">
+                <button class="button is-light" onclick="closeMarkerForm()">Cancel</button>
+            </p>
+        </div>
+    </div>
+    <div id="shareModal" class="box">
+        <h3 class="title is-4">Share Markers</h3>
+        <div>Send this link to your friends to share your markers</div>
+        <div class="field">
+            <label class="label">Share URL:</label>
+            <input class="input" type="text" id="shareUrl" readonly />
+        </div>
+        <div class="field is-grouped">
+            <p class="control">
+                <button class="button is-link" onclick="copyToClipboard()">Copy to Clipboard</button>
+            </p>
+            <p class="control">
+                <button class="button is-light" onclick="closeShareModal()">Close</button>
+            </p>
+        </div>
     </div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
     <script src="lzma_worker-min.js"></script>
     <script>
+        const notyf = new Notyf();
+
         var map = L.map('map', {
             minZoom: 0,
             maxZoom: 6,
@@ -130,18 +153,16 @@
         var w = 8300,
             h = 11700;
 
-        // Setze die Bildgrenzen
+        // Set the image boundaries
         var southWest = map.unproject([0, h], map.getMaxZoom());
         var northEast = map.unproject([w, 0], map.getMaxZoom());
         var bounds = new L.LatLngBounds(southWest, northEast);
 
-        // Definiere den Tile-Layer und füge ihn zur Karte hinzu
+        // Define the tile layer and add it to the map
         L.tileLayer('tiles/{z}/{x}_{y}.png', {
             attribution: '',
             maxZoom: map.getMaxZoom(),
             tileSize: 256,
-        //    noWrap: true,
-         //   bounds: bounds
         }).addTo(map);
 
         var icons = {
@@ -203,24 +224,24 @@
         populateMarkerTypeOptions();
 
         storedMarkers.forEach(function(markerData) {
-        var icon = getIconByType(markerData.type);
+            var icon = getIconByType(markerData.type);
 
-        var marker = L.marker([markerData.lat, markerData.lng], {
-            icon: icon,
-            contextmenu: true,
-            contextmenuItems: [{
-                text: 'Delete marker',
-                callback: function() {
-                    deleteMarker(marker, markerData);
-                }
-            }]
-        }).addTo(map);
+            var marker = L.marker([markerData.lat, markerData.lng], {
+                icon: icon,
+                contextmenu: true,
+                contextmenuItems: [{
+                    text: 'Delete marker',
+                    callback: function() {
+                        deleteMarker(marker, markerData);
+                    }
+                }]
+            }).addTo(map);
 
-        if (markerData.text) {
-            marker.bindPopup(markerData.text);
-        }
-        markers.push(marker);
-    });
+            if (markerData.text) {
+                marker.bindPopup(markerData.text);
+            }
+            markers.push(marker);
+        });
 
         function openMarkerForm(e) {
             var latlng = e.latlng;
@@ -234,7 +255,7 @@
 
         function addMarker() {
             if (!selectedIconType) {
-                alert('Please select a marker type.');
+                notyf.error('Please select a marker type.');
                 return;
             }
 
@@ -300,8 +321,21 @@
                 var compressedData = new Uint8Array(result);
                 var encodedData = base64UrlEncode(compressedData);
                 var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
-                prompt("Share this link to import markers:", shareLink);
+                document.getElementById('shareUrl').value = shareLink;
+                document.getElementById('shareModal').style.display = 'block';
             });
+        }
+
+        function closeShareModal() {
+            document.getElementById('shareModal').style.display = 'none';
+        }
+
+        function copyToClipboard() {
+            var copyText = document.getElementById('shareUrl');
+            copyText.select();
+            copyText.setSelectionRange(0, 99999); /* For mobile devices */
+            document.execCommand("copy");
+            notyf.success("Copied to clipboard");
         }
 
         function importMarkers() {
@@ -310,6 +344,7 @@
             LZMA.decompress(compressedData, function(result) {
                 var importedMarkers = JSON.parse(result);
                 addImportedMarkers(importedMarkers);
+                notyf.success("Markers imported successfully");
             });
         }
 
@@ -351,6 +386,7 @@
             markers = [];
             storedMarkers = [];
             localStorage.removeItem('markers');
+            notyf.info("All markers cleaned");
         }
 
         function checkForSharedMarkers() {
@@ -361,6 +397,7 @@
                 LZMA.decompress(compressedData, function(result) {
                     var sharedMarkers = JSON.parse(result);
                     importSharedMarkers(sharedMarkers);
+                    notyf.success("Shared markers imported successfully");
                 });
             }
         }
