@@ -114,7 +114,7 @@
     <script>
         var map = L.map('map', {
             minZoom: 0,
-            maxZoom: 4,
+            maxZoom: 6,
             center: [0, 0],
             zoom: 0,
             crs: L.CRS.Simple,
@@ -127,13 +127,22 @@
             }]
         });
 
-        var w = 5250, h = 7415; // Dimensions of the image
-        var southWest = map.unproject([0, h], map.getMaxZoom()-1);
-        var northEast = map.unproject([w, 0], map.getMaxZoom()-1);
+        var w = 8300,
+            h = 11700;
+
+        // Setze die Bildgrenzen
+        var southWest = map.unproject([0, h], map.getMaxZoom());
+        var northEast = map.unproject([w, 0], map.getMaxZoom());
         var bounds = new L.LatLngBounds(southWest, northEast);
 
-        L.imageOverlay('Fullmap_web_courtesy_of_Phoenix.jpg', bounds).addTo(map);
-        map.setMaxBounds(bounds);
+        // Definiere den Tile-Layer und füge ihn zur Karte hinzu
+        L.tileLayer('tiles/{z}/{x}_{y}.png', {
+            attribution: '',
+            maxZoom: map.getMaxZoom(),
+            tileSize: 256,
+        //    noWrap: true,
+         //   bounds: bounds
+        }).addTo(map);
 
         var icons = {
             house: { iconUrl: 'icons/house.png', iconSize: [32, 32] },
