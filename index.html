@@ -24,7 +24,7 @@
             display: block;
             margin-bottom: 5px;
         }
-        #markerFormOverlay, #shareModal {
+        #markerFormOverlay, #shareModal, #confirmDeleteModal {
             position: fixed;
             top: 50%;
             left: 50%;
@@ -85,7 +85,7 @@
     <div id="map"></div>
     <div class="map-overlay">
         <button class="button is-small is-link" onclick="shareMarkers()">Share Markers</button>
-        <button class="button is-small is-danger" onclick="cleanMarkers()">Clean Markers</button>
+        <button class="button is-small is-danger" onclick="showConfirmDeleteModal()">Clean Markers</button>
     </div>
     <div id="markerFormOverlay" class="box">
         <h3 class="title is-4">Create Marker</h3>
@@ -125,6 +125,18 @@
             </p>
             <p class="control">
                 <button class="button is-light" onclick="closeShareModal()">Close</button>
+            </p>
+        </div>
+    </div>
+    <div id="confirmDeleteModal" class="box">
+        <h3 class="title is-4">Confirm Delete</h3>
+        <div>Are you sure you want to delete all markers?</div>
+        <div class="field is-grouped" style="margin-top: 20px;">
+            <p class="control">
+                <button class="button is-danger" onclick="confirmDeleteMarkers()">Delete</button>
+            </p>
+            <p class="control">
+                <button class="button is-light" onclick="closeConfirmDeleteModal()">Cancel</button>
             </p>
         </div>
     </div>
@@ -283,7 +295,6 @@
             markers.push(marker);
 
             closeMarkerForm();
-            updateShareLink();
         }
 
         function storeMarker(latlng, text, type) {
@@ -300,7 +311,6 @@
             if (index !== -1) {
                 storedMarkers.splice(index, 1);
                 localStorage.setItem('markers', JSON.stringify(storedMarkers));
-                updateShareLink();
             }
         }
 
@@ -317,22 +327,17 @@
             return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
         }
 
-        function updateShareLink() {
+        function shareMarkers() {
             var markersData = JSON.stringify(storedMarkers);
-
             LZMA.compress(markersData, 1, function(result) {
                 var compressedData = new Uint8Array(result);
                 var encodedData = base64UrlEncode(compressedData);
                 var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
-               // history.replaceState(null, '', shareLink);
-            });
-        }
 
-        function shareMarkers() {
-            updateShareLink();
-            var shareLink = document.location.href;
-            document.getElementById('shareUrl').value = shareLink;
-            document.getElementById('shareModal').style.display = 'block';
+                document.getElementById('shareUrl').value = shareLink;
+                document.getElementById('shareModal').style.display = 'block';
+            });
+           
         }
 
         function closeShareModal() {
@@ -347,6 +352,19 @@
             notyf.success("Copied to clipboard");
         }
 
+        function showConfirmDeleteModal() {
+            document.getElementById('confirmDeleteModal').style.display = 'block';
+        }
+
+        function closeConfirmDeleteModal() {
+            document.getElementById('confirmDeleteModal').style.display = 'none';
+        }
+
+        function confirmDeleteMarkers() {
+            cleanMarkers();
+            closeConfirmDeleteModal();
+        }
+
         function importMarkers() {
             var importData = document.getElementById('importData').value;
             var compressedData = base64UrlDecode(importData);
@@ -354,7 +372,6 @@
                 var importedMarkers = JSON.parse(result);
                 addImportedMarkers(importedMarkers);
                 notyf.success("Markers imported successfully");
-                updateShareLink();
             });
         }
 
@@ -397,7 +414,6 @@
             storedMarkers = [];
             localStorage.removeItem('markers');
             notyf.success("All markers cleaned");
-            updateShareLink();
         }
 
         function checkForSharedMarkers() {
