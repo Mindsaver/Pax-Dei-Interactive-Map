@@ -84,7 +84,7 @@
 <body>
     <div id="map"></div>
     <div class="map-overlay">
-        <button class="button is-small is-primary" onclick="shareMarkers()">Share Markers</button>
+        <button class="button is-small is-link" onclick="shareMarkers()">Share Markers</button>
         <button class="button is-small is-danger" onclick="cleanMarkers()">Clean Markers</button>
     </div>
     <div id="markerFormOverlay" class="box">
@@ -283,6 +283,7 @@
             markers.push(marker);
 
             closeMarkerForm();
+            updateShareLink();
         }
 
         function storeMarker(latlng, text, type) {
@@ -299,6 +300,7 @@
             if (index !== -1) {
                 storedMarkers.splice(index, 1);
                 localStorage.setItem('markers', JSON.stringify(storedMarkers));
+                updateShareLink();
             }
         }
 
@@ -315,15 +317,21 @@
             return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
         }
 
-        function shareMarkers() {
+        function updateShareLink() {
             var markersData = JSON.stringify(storedMarkers);
             LZMA.compress(markersData, 1, function(result) {
                 var compressedData = new Uint8Array(result);
                 var encodedData = base64UrlEncode(compressedData);
                 var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
-                document.getElementById('shareUrl').value = shareLink;
-                document.getElementById('shareModal').style.display = 'block';
+                history.replaceState(null, '', shareLink);
             });
+        }
+
+        function shareMarkers() {
+            updateShareLink();
+            var shareLink = document.location.href;
+            document.getElementById('shareUrl').value = shareLink;
+            document.getElementById('shareModal').style.display = 'block';
         }
 
         function closeShareModal() {
@@ -345,6 +353,7 @@
                 var importedMarkers = JSON.parse(result);
                 addImportedMarkers(importedMarkers);
                 notyf.success("Markers imported successfully");
+                updateShareLink();
             });
         }
 
@@ -386,7 +395,8 @@
             markers = [];
             storedMarkers = [];
             localStorage.removeItem('markers');
-            notyf.info("All markers cleaned");
+            notyf.success("All markers cleaned");
+            updateShareLink();
         }
 
         function checkForSharedMarkers() {
@@ -397,12 +407,13 @@
                 LZMA.decompress(compressedData, function(result) {
                     var sharedMarkers = JSON.parse(result);
                     importSharedMarkers(sharedMarkers);
-                    notyf.success("Shared markers imported successfully");
+
                 });
             }
         }
 
         function importSharedMarkers(sharedMarkers) {
+            var markerAdded = false;
             sharedMarkers.forEach(function(markerData) {
                 if (!isMarkerExist(markerData)) {
                     var icon = getIconByType(markerData.type);
@@ -423,8 +434,12 @@
                     }
                     markers.push(marker);
                     storeMarker(markerData, markerData.text, markerData.type);
+                    markerAdded = true;
                 }
             });
+            if(markerAdded) {
+            notyf.success("Shared markers imported successfully");
+            }
         }
 
         checkForSharedMarkers();
