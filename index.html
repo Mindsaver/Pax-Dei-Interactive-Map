@@ -568,6 +568,9 @@
                 var compressedData = base64UrlDecode(encodedData);
                 LZMA.decompress(compressedData, function(result) {
                     var sharedData = JSON.parse(result);
+                    if(sharedData.markers == null && sharedData.length !== 0) {
+                        sharedData.markers = sharedData;
+                    }
                     importSharedMarkers(sharedData.markers);
                     importSharedShapes(sharedData.shapes);
                     urlParams.delete('markers');
