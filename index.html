@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Interactive Map with Custom Text Markers</title>
+    <title>Interactive Map with Custom Text Markers and Drawings</title>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css">
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.css" />
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
     <style>
         #map { height: 100vh; }
         .map-overlay {
@@ -155,6 +156,7 @@
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="lzma_worker-min.js"></script>
     <script>
         const notyf = new Notyf();
@@ -169,6 +171,7 @@
             hasConsent = true;
             document.getElementById('gdprModal').style.display = 'none';
             loadStoredMarkers();
+            loadStoredShapes();
             checkForSharedMarkers();
         }
 
@@ -230,7 +233,9 @@
 
         var selectedIconType = null;
         var markers = [];
+        var shapes = [];
         var storedMarkers = hasConsent ? JSON.parse(localStorage.getItem('markers')) || [] : [];
+        var storedShapes = hasConsent ? JSON.parse(localStorage.getItem('shapes')) || [] : [];
 
         function getIconByType(type) {
             return L.icon(icons[type] || icons.house);
@@ -273,6 +278,7 @@
 
         if (hasConsent) {
             loadStoredMarkers();
+            loadStoredShapes();
         }
 
         function loadStoredMarkers() {
@@ -294,6 +300,30 @@
                     marker.bindPopup(markerData.text);
                 }
                 markers.push(marker);
+            });
+        }
+
+        function loadStoredShapes() {
+            storedShapes.forEach(function(shapeData) {
+                var shape;
+                if (shapeData.type === 'polyline') {
+                    shape = L.polyline(shapeData.latlngs, { color: shapeData.color });
+                } else if (shapeData.type === 'polygon') {
+                    shape = L.polygon(shapeData.latlngs, { color: shapeData.color });
+                } else if (shapeData.type === 'rectangle') {
+                    shape = L.rectangle(shapeData.latlngs, { color: shapeData.color });
+                } else if (shapeData.type === 'circle') {
+                    shape = L.circle(shapeData.latlngs, { radius: shapeData.radius, color: shapeData.color });
+                } else if (shapeData.type === 'text') {
+                    shape = L.marker(shapeData.latlngs, {
+                        icon: L.divIcon({
+                            className: 'text-label',
+                            html: '<div style="font-size: 12px; color: ' + shapeData.color + ';">' + shapeData.text + '</div>'
+                        })
+                    });
+                }
+                shape.addTo(map);
+                shapes.push(shape);
             });
         }
 
@@ -350,11 +380,33 @@
             map.removeLayer(marker);
             if (!hasConsent) return;
             var index = storedMarkers.findIndex(function(m) {
-                return m.lat === markerData.lat && m.lng === markerData.lng;
+                return m.lat === markerData.lat && m.lng === markerData.lng && m.type === markerData.type && m.text === markerData.text;
             });
             if (index !== -1) {
                 storedMarkers.splice(index, 1);
                 localStorage.setItem('markers', JSON.stringify(storedMarkers));
+            }
+        }
+
+        function storeShape(shapeData) {
+            if (!hasConsent) return;
+            storedShapes.push(shapeData);
+            localStorage.setItem('shapes', JSON.stringify(storedShapes));
+        }
+
+        function deleteShapeByLayer(layer) {
+            var shapeData = getShapeData(layer);
+            deleteShape(shapeData);
+        }
+
+        function deleteShape(shapeData) {
+            if (!hasConsent) return;
+            var index = storedShapes.findIndex(function(s) {
+                return JSON.stringify(s) === JSON.stringify(shapeData);
+            });
+            if (index !== -1) {
+                storedShapes.splice(index, 1);
+                localStorage.setItem('shapes', JSON.stringify(storedShapes));
             }
         }
 
@@ -371,10 +423,8 @@
             return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
         }
 
-
-
         function shareMarkers() {
-            var markersData = JSON.stringify(storedMarkers);
+            var markersData = JSON.stringify({ markers: storedMarkers, shapes: storedShapes });
             LZMA.compress(markersData, 1, function(result) {
                 var compressedData = new Uint8Array(result);
                 var encodedData = base64UrlEncode(compressedData);
@@ -382,7 +432,6 @@
                 document.getElementById('shareUrl').value = shareLink;
                 document.getElementById('shareModal').style.display = 'block';
             });
-            
         }
 
         function closeShareModal() {
@@ -407,6 +456,7 @@
 
         function confirmDeleteMarkers() {
             cleanMarkers();
+            cleanShapes();
             closeConfirmDeleteModal();
         }
 
@@ -414,10 +464,10 @@
             var importData = document.getElementById('importData').value;
             var compressedData = base64UrlDecode(importData);
             LZMA.decompress(compressedData, function(result) {
-                var importedMarkers = JSON.parse(result);
-                addImportedMarkers(importedMarkers);
-                notyf.success("Markers imported successfully");
-   
+                var importedData = JSON.parse(result);
+                addImportedMarkers(importedData.markers);
+                addImportedShapes(importedData.shapes);
+                notyf.success("Markers and shapes imported successfully");
             });
         }
 
@@ -441,7 +491,34 @@
                         marker.bindPopup(markerData.text);
                     }
                     markers.push(marker);
-                    storeMarker(markerData, markerData.text, markerData.type);
+                    storeMarker(markerData.lat, markerData.lng, markerData.text, markerData.type);
+                }
+            });
+        }
+
+        function addImportedShapes(importedShapes) {
+            importedShapes.forEach(function(shapeData) {
+                if (!isShapeExist(shapeData)) {
+                    var shape;
+                    if (shapeData.type === 'polyline') {
+                        shape = L.polyline(shapeData.latlngs, { color: shapeData.color });
+                    } else if (shapeData.type === 'polygon') {
+                        shape = L.polygon(shapeData.latlngs, { color: shapeData.color });
+                    } else if (shapeData.type === 'rectangle') {
+                        shape = L.rectangle(shapeData.latlngs, { color: shapeData.color });
+                    } else if (shapeData.type === 'circle') {
+                        shape = L.circle(shapeData.latlngs, { radius: shapeData.radius, color: shapeData.color });
+                    } else if (shapeData.type === 'text') {
+                        shape = L.marker(shapeData.latlngs, {
+                            icon: L.divIcon({
+                                className: 'text-label',
+                                html: '<div style="font-size: 12px; color: ' + shapeData.color + ';">' + shapeData.text + '</div>'
+                            })
+                        });
+                    }
+                    shape.addTo(map);
+                    shapes.push(shape);
+                    storeShape(shapeData);
                 }
             });
         }
@@ -449,7 +526,14 @@
         function isMarkerExist(markerData) {
             if (!hasConsent) return false;
             return storedMarkers.some(function(storedMarker) {
-                return storedMarker.lat === markerData.lat && storedMarker.lng === markerData.lng;
+                return storedMarker.lat === markerData.lat && storedMarker.lng === markerData.lng && storedMarker.type === markerData.type && storedMarker.text === markerData.text;
+            });
+        }
+
+        function isShapeExist(shapeData) {
+            if (!hasConsent) return false;
+            return storedShapes.some(function(storedShape) {
+                return JSON.stringify(storedShape) === JSON.stringify(shapeData);
             });
         }
 
@@ -465,15 +549,30 @@
             notyf.success("All markers cleaned");
         }
 
+        function cleanShapes() {
+            shapes.forEach(function(shape) {
+                map.removeLayer(shape);
+            });
+            shapes = [];
+            if (hasConsent) {
+                storedShapes = [];
+                localStorage.removeItem('shapes');
+            }
+            notyf.success("All shapes cleaned");
+        }
+
         function checkForSharedMarkers() {
             var urlParams = new URLSearchParams(window.location.search);
             if (urlParams.has('markers')) {
                 var encodedData = urlParams.get('markers');
                 var compressedData = base64UrlDecode(encodedData);
                 LZMA.decompress(compressedData, function(result) {
-                    var sharedMarkers = JSON.parse(result);
-                    importSharedMarkers(sharedMarkers);
-
+                    var sharedData = JSON.parse(result);
+                    importSharedMarkers(sharedData.markers);
+                    importSharedShapes(sharedData.shapes);
+                    urlParams.delete('markers');
+                    var newUrl = window.location.pathname;
+                    window.history.replaceState(null, '', newUrl);
                 });
             }
         }
@@ -504,11 +603,88 @@
                 }
             });
             if(markerAdded) {
-            notyf.success("Shared markers imported successfully");
+                notyf.success("Shared markers imported successfully");
+            }
+        }
+
+        function importSharedShapes(sharedShapes) {
+            var shapeAdded = false;
+            sharedShapes.forEach(function(shapeData) {
+                if (!isShapeExist(shapeData)) {
+                    var shape;
+                    if (shapeData.type === 'polyline') {
+                        shape = L.polyline(shapeData.latlngs, { color: shapeData.color });
+                    } else if (shapeData.type === 'polygon') {
+                        shape = L.polygon(shapeData.latlngs, { color: shapeData.color });
+                    } else if (shapeData.type === 'rectangle') {
+                        shape = L.rectangle(shapeData.latlngs, { color: shapeData.color });
+                    } else if (shapeData.type === 'circle') {
+                        shape = L.circle(shapeData.latlngs, { radius: shapeData.radius, color: shapeData.color });
+                    } else if (shapeData.type === 'text') {
+                        shape = L.marker(shapeData.latlngs, {
+                            icon: L.divIcon({
+                                className: 'text-label',
+                                html: '<div style="font-size: 12px; color: ' + shapeData.color + ';">' + shapeData.text + '</div>'
+                            })
+                        });
+                    }
+                    shape.addTo(map);
+                    shapes.push(shape);
+                    storeShape(shapeData);
+                    shapeAdded = true;
+                }
+            });
+            if(shapeAdded) {
+                notyf.success("Shared shapes imported successfully");
             }
         }
 
         checkForSharedMarkers();
+
+        // Leaflet Draw
+        var drawControl = new L.Control.Draw({
+            draw: {
+                polyline: true,
+                polygon: true,
+                rectangle: true,
+                circle: true,
+                marker: false,
+                circlemarker: false
+            },
+            edit: {
+                featureGroup: L.featureGroup(shapes).addTo(map)
+            }
+        });
+        map.addControl(drawControl);
+
+        map.on(L.Draw.Event.CREATED, function (e) {
+            var type = e.layerType,
+                layer = e.layer;
+
+            if (type === 'polyline' || type === 'polygon' || type === 'rectangle' || type === 'circle') {
+                shapes.push(layer);
+                map.addLayer(layer);
+                storeShape(getShapeData(layer, type));
+            }
+        });
+
+        map.on('draw:deleted', function (e) {
+            e.layers.eachLayer(function (layer) {
+                var shapeData = getShapeData(layer, layer instanceof L.Circle ? 'circle' : layer instanceof L.Rectangle ? 'rectangle' : layer instanceof L.Polygon ? 'polygon' : layer instanceof L.Polyline ? 'polyline' : null);
+                deleteShape(shapeData);
+            });
+        });
+
+        function getShapeData(layer, type) {
+            var shapeData = { type: type, color: '#3388ff' };
+            if (type === 'polyline' || type === 'polygon' || type === 'rectangle') {
+                shapeData.latlngs = layer.getLatLngs();
+            } else if (type === 'circle') {
+                shapeData.latlngs = layer.getLatLng();
+                shapeData.radius = layer.getRadius();
+            }
+            return shapeData;
+        }
     </script>
 </body>
 </html>
