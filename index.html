@@ -24,7 +24,7 @@
             display: block;
             margin-bottom: 5px;
         }
-        #markerFormOverlay, #shareModal, #confirmDeleteModal {
+        #markerFormOverlay, #shareModal, #confirmDeleteModal, #gdprModal {
             position: fixed;
             top: 50%;
             left: 50%;
@@ -140,12 +140,41 @@
             </p>
         </div>
     </div>
+    <div id="gdprModal" class="box">
+        <h3 class="title is-4">GDPR Consent</h3>
+        <div>We use local storage to save your markers. By using this application, you agree to our <a href="privacy.html" target="_blank">Privacy Policy</a>.</div>
+        <div class="field is-grouped" style="margin-top: 20px;">
+            <p class="control">
+                <button class="button is-primary" onclick="acceptGDPR()">Accept</button>
+            </p>
+            <p class="control">
+                <button class="button is-light" onclick="rejectGDPR()">Reject</button>
+            </p>
+        </div>
+    </div>
     <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-contextmenu/1.4.0/leaflet.contextmenu.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
     <script src="lzma_worker-min.js"></script>
     <script>
         const notyf = new Notyf();
+
+        let hasConsent = localStorage.getItem('gdprConsent') === 'accepted';
+        if (!hasConsent) {
+            document.getElementById('gdprModal').style.display = 'block';
+        }
+
+        function acceptGDPR() {
+            localStorage.setItem('gdprConsent', 'accepted');
+            hasConsent = true;
+            document.getElementById('gdprModal').style.display = 'none';
+            loadStoredMarkers();
+            checkForSharedMarkers();
+        }
+
+        function rejectGDPR() {
+            notyf.error('You need to accept GDPR consent to use this application.');
+        }
 
         var map = L.map('map', {
             minZoom: 0,
@@ -194,7 +223,7 @@
 
         var selectedIconType = null;
         var markers = [];
-        var storedMarkers = JSON.parse(localStorage.getItem('markers')) || [];
+        var storedMarkers = hasConsent ? JSON.parse(localStorage.getItem('markers')) || [] : [];
 
         function getIconByType(type) {
             return L.icon(icons[type] || icons.house);
@@ -235,25 +264,31 @@
 
         populateMarkerTypeOptions();
 
-        storedMarkers.forEach(function(markerData) {
-            var icon = getIconByType(markerData.type);
+        if (hasConsent) {
+            loadStoredMarkers();
+        }
 
-            var marker = L.marker([markerData.lat, markerData.lng], {
-                icon: icon,
-                contextmenu: true,
-                contextmenuItems: [{
-                    text: 'Delete marker',
-                    callback: function() {
-                        deleteMarker(marker, markerData);
-                    }
-                }]
-            }).addTo(map);
+        function loadStoredMarkers() {
+            storedMarkers.forEach(function(markerData) {
+                var icon = getIconByType(markerData.type);
 
-            if (markerData.text) {
-                marker.bindPopup(markerData.text);
-            }
-            markers.push(marker);
-        });
+                var marker = L.marker([markerData.lat, markerData.lng], {
+                    icon: icon,
+                    contextmenu: true,
+                    contextmenuItems: [{
+                        text: 'Delete marker',
+                        callback: function() {
+                            deleteMarker(marker, markerData);
+                        }
+                    }]
+                }).addTo(map);
+
+                if (markerData.text) {
+                    marker.bindPopup(markerData.text);
+                }
+                markers.push(marker);
+            });
+        }
 
         function openMarkerForm(e) {
             var latlng = e.latlng;
@@ -298,6 +333,7 @@
         }
 
         function storeMarker(latlng, text, type) {
+            if (!hasConsent) return;
             var markerData = { lat: latlng.lat, lng: latlng.lng, text: text, type: type };
             storedMarkers.push(markerData);
             localStorage.setItem('markers', JSON.stringify(storedMarkers));
@@ -305,6 +341,7 @@
 
         function deleteMarker(marker, markerData) {
             map.removeLayer(marker);
+            if (!hasConsent) return;
             var index = storedMarkers.findIndex(function(m) {
                 return m.lat === markerData.lat && m.lng === markerData.lng;
             });
@@ -327,17 +364,18 @@
             return Uint8Array.from(atob(base64), c => c.charCodeAt(0));
         }
 
+
+
         function shareMarkers() {
             var markersData = JSON.stringify(storedMarkers);
             LZMA.compress(markersData, 1, function(result) {
                 var compressedData = new Uint8Array(result);
                 var encodedData = base64UrlEncode(compressedData);
                 var shareLink = `${window.location.href.split('?')[0]}?markers=${encodedData}`;
-
                 document.getElementById('shareUrl').value = shareLink;
                 document.getElementById('shareModal').style.display = 'block';
             });
-           
+            
         }
 
         function closeShareModal() {
@@ -372,6 +410,7 @@
                 var importedMarkers = JSON.parse(result);
                 addImportedMarkers(importedMarkers);
                 notyf.success("Markers imported successfully");
+   
             });
         }
 
@@ -401,6 +440,7 @@
         }
 
         function isMarkerExist(markerData) {
+            if (!hasConsent) return false;
             return storedMarkers.some(function(storedMarker) {
                 return storedMarker.lat === markerData.lat && storedMarker.lng === markerData.lng;
             });
@@ -411,8 +451,10 @@
                 map.removeLayer(marker);
             });
             markers = [];
-            storedMarkers = [];
-            localStorage.removeItem('markers');
+            if (hasConsent) {
+                storedMarkers = [];
+                localStorage.removeItem('markers');
+            }
             notyf.success("All markers cleaned");
         }
 
