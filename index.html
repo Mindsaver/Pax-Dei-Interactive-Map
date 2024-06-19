@@ -170,9 +170,10 @@
             localStorage.setItem('gdprConsent', 'accepted');
             hasConsent = true;
             document.getElementById('gdprModal').style.display = 'none';
+            checkForSharedMarkers();
             loadStoredMarkers();
             loadStoredShapes();
-            checkForSharedMarkers();
+            
         }
 
         function rejectGDPR() {
@@ -641,8 +642,9 @@
                 notyf.success("Shared shapes imported successfully");
             }
         }
-
-        checkForSharedMarkers();
+        console.log(hasConsent)
+        if(hasConsent)
+            checkForSharedMarkers();
 
         // Leaflet Draw
         var drawControl = new L.Control.Draw({
