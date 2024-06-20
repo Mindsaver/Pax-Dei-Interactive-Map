@@ -158,6 +158,8 @@
     <script src="https://cdn.jsdelivr.net/npm/notyf@3/notyf.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
     <script src="lzma_worker-min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/2.3.4/purify.min.js"></script>
+
     <script>
         const notyf = new Notyf();
 
@@ -285,7 +287,6 @@
         function loadStoredMarkers() {
             storedMarkers.forEach(function(markerData) {
                 var icon = getIconByType(markerData.type);
-
                 var marker = L.marker([markerData.lat, markerData.lng], {
                     icon: icon,
                     contextmenu: true,
@@ -298,7 +299,8 @@
                 }).addTo(map);
 
                 if (markerData.text) {
-                    marker.bindPopup(markerData.text);
+                    // Sanitize text before binding to popup
+                    marker.bindPopup(DOMPurify.sanitize(markerData.text, {ALLOWED_TAGS: [], ALLOWED_ATTR: []}));
                 }
                 markers.push(marker);
             });
@@ -347,6 +349,9 @@
             var latlng = JSON.parse(document.getElementById('markerFormOverlay').dataset.latlng);
             var text = document.getElementById('markerText').value;
 
+            // Sanitize the input
+            text = DOMPurify.sanitize(text, {ALLOWED_TAGS: [], ALLOWED_ATTR: []});
+
             var icon = getIconByType(selectedIconType);
 
             var marker = L.marker(latlng, {
@@ -370,8 +375,11 @@
             closeMarkerForm();
         }
 
+
         function storeMarker(latlng, text, type) {
             if (!hasConsent) return;
+            // Sanitize the text before storing
+            text = DOMPurify.sanitize(text, {ALLOWED_TAGS: [], ALLOWED_ATTR: []});
             var markerData = { lat: latlng.lat, lng: latlng.lng, text: text, type: type };
             storedMarkers.push(markerData);
             localStorage.setItem('markers', JSON.stringify(storedMarkers));
@@ -425,7 +433,16 @@
         }
 
         function shareMarkers() {
-            var markersData = JSON.stringify({ markers: storedMarkers, shapes: storedShapes });
+
+            const sanitizedMarkers = storedMarkers.map(marker => {
+                return {
+                    ...marker,
+                    text: DOMPurify.sanitize(marker.text, { ALLOWED_TAGS: [], ALLOWED_ATTR: [] })
+                };
+            });
+            
+            var markersData = JSON.stringify({ markers: sanitizedMarkers, shapes: storedShapes });
+
             LZMA.compress(markersData, 1, function(result) {
                 var compressedData = new Uint8Array(result);
                 var encodedData = base64UrlEncode(compressedData);
@@ -488,11 +505,12 @@
                         }]
                     }).addTo(map);
 
-                    if (markerData.text) {
-                        marker.bindPopup(markerData.text);
+                    text = DOMPurify.sanitize(markerData.text, {ALLOWED_TAGS: [], ALLOWED_ATTR: []});
+                    if (text) {
+                        marker.bindPopup(text);
                     }
                     markers.push(marker);
-                    storeMarker(markerData.lat, markerData.lng, markerData.text, markerData.type);
+                    storeMarker(markerData.lat, markerData.lng, text, markerData.type);
                 }
             });
         }
